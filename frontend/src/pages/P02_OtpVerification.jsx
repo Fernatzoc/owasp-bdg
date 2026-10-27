@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { KeyRound, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
+import { KeyRound, RefreshCw, AlertCircle, ArrowLeft, Sparkles, Check } from 'lucide-react';
 
 export default function P02_OtpVerification() {
   const location = useLocation();
@@ -10,6 +10,7 @@ export default function P02_OtpVerification() {
 
   const loginTicket = location.state?.loginTicket;
   const userEmail = location.state?.email || 'su correo';
+  const [demoOtp, setDemoOtp] = useState(location.state?.demoOtp || null);
 
   // 6 casillas individuales
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
@@ -89,9 +90,10 @@ export default function P02_OtpVerification() {
 
   const fullOtp = digits.join('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, codeOverride = null) => {
     e?.preventDefault();
-    if (fullOtp.length !== 6) {
+    const codeToVerify = codeOverride || fullOtp;
+    if (codeToVerify.length !== 6) {
       setError('Por favor ingrese los 6 dígitos del código OTP');
       return;
     }
@@ -105,7 +107,7 @@ export default function P02_OtpVerification() {
     setLoading(true);
 
     try {
-      await verifyOtp(loginTicket, fullOtp, false);
+      await verifyOtp(loginTicket, codeToVerify, false);
       navigate('/dashboard');
     } catch (err) {
       const resp = err.response?.data;
@@ -114,7 +116,7 @@ export default function P02_OtpVerification() {
         navigate('/sesion-activa', {
           state: {
             loginTicket,
-            otp: fullOtp,
+            otp: codeToVerify,
             email: userEmail
           }
         });
@@ -139,7 +141,10 @@ export default function P02_OtpVerification() {
     setLoading(true);
 
     try {
-      await resendOtp(loginTicket);
+      const data = await resendOtp(loginTicket);
+      if (data?.demo_otp) {
+        setDemoOtp(data.demo_otp);
+      }
       setInfoMessage('Se ha enviado un nuevo código OTP a su correo');
       setResendCooldown(60);
       setCanResend(false);
@@ -187,6 +192,35 @@ export default function P02_OtpVerification() {
           {infoMessage && (
             <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-sm">
               {infoMessage}
+            </div>
+          )}
+
+          {demoOtp && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-sm shadow-sm">
+              <div className="flex items-center gap-2 font-bold mb-1 text-amber-900">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span>Modo Demostración / Evaluación</span>
+              </div>
+              <p className="text-xs text-amber-800 mb-2.5">
+                Código OTP generado para esta cuenta de prueba:
+              </p>
+              <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-lg border border-amber-200 shadow-inner">
+                <span className="font-mono text-2xl font-black tracking-widest text-emerald-600">
+                  {demoOtp}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const chars = demoOtp.split('');
+                    setDigits(chars);
+                    handleSubmit(null, demoOtp);
+                  }}
+                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Autocompletar
+                </button>
+              </div>
             </div>
           )}
 

@@ -31,7 +31,8 @@ export default function P01_Login() {
         navigate('/verificar-otp', {
           state: {
             loginTicket: data.login_ticket,
-            email: email
+            email: email,
+            demoOtp: data.demo_otp
           }
         });
       }

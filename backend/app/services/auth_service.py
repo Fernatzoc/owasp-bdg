@@ -329,7 +329,8 @@ async def login_step1(db: AsyncIOMotorDatabase, data: LoginStep1Request, ip: str
     return LoginStep1Response(
         otp_required=True,
         login_ticket=login_ticket,
-        mensaje="Se ha enviado un código de verificación a su correo"
+        mensaje="Se ha enviado un código de verificación a su correo",
+        demo_otp=otp_code if settings.MOCK_EXTERNAL_SERVICES else None
     )
 
 
@@ -416,7 +417,8 @@ async def resend_otp(db: AsyncIOMotorDatabase, login_ticket: str, ip: str) -> Di
 
     return {
         "mensaje": "Nuevo código de verificación enviado",
-        "login_ticket": nuevo_ticket
+        "login_ticket": nuevo_ticket,
+        "demo_otp": otp_code if settings.MOCK_EXTERNAL_SERVICES else None
     }
 
 

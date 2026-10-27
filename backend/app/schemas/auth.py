@@ -25,6 +25,7 @@ class LoginStep1Response(BaseModel):
     otp_required: bool = True
     login_ticket: str
     mensaje: str
+    demo_otp: Optional[str] = None
 
 
 class VerifyOtpRequest(BaseModel):
