@@ -1,4 +1,7 @@
 import logging
+import asyncio
+import os
+import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -31,6 +34,42 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 
+async def keep_alive_task():
+    """
+    Tarea en segundo plano para evitar que Render se duerma en el plan gratuito.
+    Render define automáticamente la variable RENDER_EXTERNAL_URL con la URL pública.
+    Hacer ping a esta URL cada 14 minutos reinicia el temporizador de inactividad de Render.
+    """
+    external_url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("APP_EXTERNAL_URL")
+    if not external_url:
+        logger.info("RENDER_EXTERNAL_URL no configurada. Keep-alive desactivado (modo local).")
+        return
+
+    logger.info("Keep-alive activado para %s cada 14 minutos.", external_url)
+    # Esperar 2 minutos tras iniciar antes del primer ping
+    try:
+        await asyncio.sleep(120)
+    except asyncio.CancelledError:
+        return
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        while True:
+            try:
+                target_url = f"{external_url.rstrip('/')}/health"
+                logger.info("[Keep-Alive] Ping a %s para evitar suspensión...", target_url)
+                resp = await client.get(target_url)
+                logger.info("[Keep-Alive] Ping exitoso (HTTP %s)", resp.status_code)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning("[Keep-Alive] Aviso durante ping: %s", e)
+
+            try:
+                await asyncio.sleep(14 * 60)  # Cada 14 minutos (Render suspende a los 15)
+            except asyncio.CancelledError:
+                break
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Iniciando aplicación y conectando a base de datos...")
@@ -52,7 +91,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Aviso durante verificación de auto-seed: {e}")
 
+    # Iniciar tarea en segundo plano de keep-alive
+    keep_alive = asyncio.create_task(keep_alive_task())
+
     yield
+
+    # Cancelar tarea keep-alive al apagar
+    keep_alive.cancel()
+    try:
+        await keep_alive
+    except asyncio.CancelledError:
+        pass
+
     logger.info("Apagando aplicación...")
     await close_db()
 
