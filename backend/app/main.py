@@ -35,6 +35,23 @@ logger = logging.getLogger("main")
 async def lifespan(app: FastAPI):
     logger.info("Iniciando aplicación y conectando a base de datos...")
     await init_db()
+    
+    # Auto-seed si la base de datos está vacía (ideal para Render Free sin Shell)
+    try:
+        from app.core.database import get_database
+        db = await get_database()
+        user_count = await db.usuarios.count_documents({})
+        if user_count == 0:
+            logger.info("Base de datos vacía detectada (0 usuarios). Ejecutando seed automático...")
+            try:
+                from scripts.seed_data import seed
+            except ImportError:
+                from backend.scripts.seed_data import seed
+            await seed()
+            logger.info("Seed automático completado con éxito.")
+    except Exception as e:
+        logger.warning(f"Aviso durante verificación de auto-seed: {e}")
+
     yield
     logger.info("Apagando aplicación...")
     await close_db()
