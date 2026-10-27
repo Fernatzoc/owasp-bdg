@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: bdg-sistema-inventario
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: MONGODB_URL
+        sync: false # Ingrese la URL de conexión de MongoDB Atlas (ej: mongodb+srv://usuario:password@cluster.mongodb.net/?retryWrites=true&w=majority)
+      - key: DATABASE_NAME
+        value: bdg_inventario
+      - key: JWT_SECRET_KEY
+        generateValue: true # Render generará automáticamente una clave segura aleatoria
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: SESSION_INACTIVITY_LIMIT_MINUTES
+        value: "30"
+      - key: MOCK_EXTERNAL_SERVICES
+        value: "true"
+      - key: TIMEZONE
+        value: America/Guatemala
+      - key: CORS_ORIGINS
+        value: "*"

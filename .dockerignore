@@ -1,0 +1,12 @@
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.coverage
+**/dist
+**/.env
+**/.env.local
+.git
+.gitignore
+.dockerignore
+.DS_Store

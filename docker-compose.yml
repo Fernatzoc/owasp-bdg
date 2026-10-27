@@ -1,0 +1,87 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: bdg_mongodb
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  mongo-init-replica:
+    image: mongo:7.0
+    container_name: bdg_mongo_init_replica
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "
+        echo 'Iniciando replica set rs0 en MongoDB...'
+        mongosh --host mongodb:27017 --eval '
+          try {
+            if (rs.status().ok === 1) {
+              console.log(\"Replica set rs0 ya estaba iniciado\");
+            }
+          } catch(e) {
+            console.log(\"Iniciando rs0...\");
+            rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"mongodb:27017\"}]});
+          }
+        '
+        echo 'Esperando que el nodo primario esté listo...'
+        until mongosh --host mongodb:27017 --eval 'rs.isMaster().ismaster' | grep -q 'true'; do
+          sleep 1;
+        done
+        echo 'Replica set rs0 configurado y listo!'
+      "
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bdg_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017/?replicaSet=rs0
+      - DATABASE_NAME=bdg_inventario
+      - SECRET_KEY=super_secreto_para_jwt_seguro_y_con_longitud_adecuada_2026
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - OTP_EXPIRE_MINUTES=5
+      - PASSWORD_RESET_EXPIRE_MINUTES=30
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8000
+      - MOCK_EXTERNAL_SERVICES=true
+      - TIMEZONE=America/Guatemala
+    volumes:
+      - ./backend:/app
+    depends_on:
+      mongo-init-replica:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bdg_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mongo_data:

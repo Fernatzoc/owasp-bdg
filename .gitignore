@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+venv/
+.venv/
+Especificación de Requerimientos – Sistema de Solicitudes a Proveedores e Inventario.md
+
+# Environment variables
+.env
+!.env.example
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# System
+.DS_Store
+*.log
