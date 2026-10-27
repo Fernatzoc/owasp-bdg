@@ -31,6 +31,11 @@ export default function P06_NewPassword() {
       return;
     }
 
+    if (!Object.values(rules).every(Boolean)) {
+      setError('La contraseña debe cumplir con todos los requisitos de seguridad (mínimo 8 caracteres, mayúscula, minúscula, número y símbolo)');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -156,8 +161,8 @@ export default function P06_NewPassword() {
 
               <button
                 type="submit"
-                disabled={loading || !isFormValid || !token}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-colors"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {loading ? 'Restableciendo...' : 'Restablecer Contraseña'}
               </button>

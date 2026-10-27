@@ -14,6 +14,7 @@ export default function P04_Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [registeredEmail, setRegisteredEmail] = useState(null);
+  const [verifyToken, setVerifyToken] = useState(null);
 
   // Reglas de la política de contraseñas (RF-SEG-01)
   const rules = {
@@ -30,8 +31,29 @@ export default function P04_Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!captchaToken) {
-      setError('Por favor complete la verificación de seguridad (Captcha)');
+
+    if (!nombre.trim()) {
+      setError('Por favor ingrese su nombre completo');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('Por favor ingrese su correo electrónico');
+      return;
+    }
+
+    if (!password) {
+      setError('Por favor ingrese una contraseña');
+      return;
+    }
+
+    if (strengthCount < 5) {
+      setError('La contraseña debe cumplir con los 5 requisitos de seguridad (mínimo 8 caracteres, mayúscula, minúscula, número y símbolo)');
+      return;
+    }
+
+    if (!confirmPassword) {
+      setError('Por favor confirme su contraseña');
       return;
     }
 
@@ -40,8 +62,8 @@ export default function P04_Register() {
       return;
     }
 
-    if (strengthCount < 5) {
-      setError('La contraseña debe cumplir con todos los requisitos de seguridad');
+    if (!captchaToken) {
+      setError('Por favor complete la verificación de seguridad (Captcha)');
       return;
     }
 
@@ -49,14 +71,18 @@ export default function P04_Register() {
     setLoading(true);
 
     try {
-      await api.post('/auth/register', {
-        nombre,
-        email,
+      const resp = await api.post('/auth/register', {
+        nombre: nombre.trim(),
+        email: email.trim(),
         password,
         confirm_password: confirmPassword,
         captcha_token: captchaToken,
       });
-      setRegisteredEmail(email);
+
+      if (resp.data?.verify_token) {
+        setVerifyToken(resp.data.verify_token);
+      }
+      setRegisteredEmail(email.trim());
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al procesar el registro');
     } finally {
@@ -76,13 +102,30 @@ export default function P04_Register() {
             <p className="mt-3 text-sm text-slate-600 leading-relaxed">
               Hemos enviado un enlace de confirmación a <span className="font-semibold text-slate-800">{registeredEmail}</span>.
             </p>
-            <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 text-left">
-              <strong>Nota del Prototipo:</strong> Como el servicio de correo está en modo simulado, el enlace de activación se imprimió en la consola del backend. Al activarse, su cuenta tendrá rol inicial de <strong>Consulta</strong>.
-            </div>
+            {verifyToken ? (
+              <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 text-left">
+                <strong>Modo Evaluación / Pruebas:</strong>
+                <p className="mt-1">
+                  Puede activar su nueva cuenta de inmediato haciendo clic abajo:
+                </p>
+                <div className="mt-3">
+                  <Link
+                    to={`/verificar-email?token=${verifyToken}`}
+                    className="w-full inline-flex justify-center py-2.5 px-4 rounded-lg bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 shadow-sm transition-colors"
+                  >
+                    Activar Cuenta Ahora
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 text-left">
+                Por favor revise su bandeja de entrada (y carpeta de spam) para activar su cuenta.
+              </div>
+            )}
             <div className="mt-6">
               <Link
                 to="/login"
-                className="w-full inline-flex justify-center py-2.5 px-4 rounded-lg bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 shadow-sm transition-colors"
+                className="w-full inline-flex justify-center py-2.5 px-4 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 shadow-sm transition-colors"
               >
                 Ir a Iniciar Sesión
               </Link>
@@ -231,6 +274,19 @@ export default function P04_Register() {
                   className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
               </div>
+              {confirmPassword && (
+                <p className={`text-xs mt-1.5 flex items-center gap-1 font-medium ${password === confirmPassword ? 'text-emerald-600' : 'text-rose-500'}`}>
+                  {password === confirmPassword ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Las contraseñas coinciden
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-3.5 h-3.5 text-rose-500" /> Las contraseñas no coinciden
+                    </>
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="pt-2">
@@ -239,8 +295,8 @@ export default function P04_Register() {
 
             <button
               type="submit"
-              disabled={loading || strengthCount < 5 || password !== confirmPassword}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-colors mt-2"
+              disabled={loading}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-colors mt-2 cursor-pointer"
             >
               {loading ? 'Registrando cuenta...' : 'Crear Cuenta'}
             </button>

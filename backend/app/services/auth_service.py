@@ -111,7 +111,8 @@ async def register_user(db: AsyncIOMotorDatabase, data: UserRegisterRequest, ip:
 
     return {
         "mensaje": "Usuario registrado exitosamente. Por favor revise su correo para verificar su cuenta.",
-        "email": email_normalizado
+        "email": email_normalizado,
+        "verify_token": raw_token if settings.MOCK_EXTERNAL_SERVICES else None
     }
 
 
