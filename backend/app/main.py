@@ -112,11 +112,56 @@ async def lifespan(app: FastAPI):
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        path = request.url.path
+
+        # 1. Content Security Policy (CSP): Eliminar 'unsafe-inline' para mitigar XSS (OWASP ZAP 10055)
+        if path in ("/docs", "/redoc", "/openapi.json"):
+            # Excepción controlada para Swagger UI y ReDoc interactivos
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "font-src 'self' data:; "
+                "connect-src 'self'; "
+                "object-src 'none'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self';"
+            )
+        else:
+            # Para la aplicación Web SPA y endpoints de la API (Cero 'unsafe-inline')
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self'; "
+                "img-src 'self' data:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'; "
+                "object-src 'none'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self';"
+            )
+
+        # 2. Strict-Transport-Security (HSTS): Fuerza HTTPS en todo el dominio por 1 año
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
+        # 3. Directivas de Caché (Cache-Control): Evita almacenamiento de datos sensibles en proxies/navegadores
+        if path.startswith("/assets/"):
+            # Archivos estáticos con hash inmutable
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            # Endpoints de API y vistas dinámicas: No almacenar en caché
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+            response.headers["Pragma"] = "no-cache"
+
+        # 4. Otras cabeceras de seguridad requeridas por OWASP
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+
         return response
 
 app = FastAPI(
