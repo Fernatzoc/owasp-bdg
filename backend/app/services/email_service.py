@@ -11,6 +11,36 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+async def _send_brevo_http(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
+    """Envío mediante Brevo HTTPS API (Puerto 443 - Permite enviar a CUALQUIER correo sin verificar dominio)."""
+    try:
+        sender_email = settings.BREVO_SENDER_EMAIL or "fernandotzoc4@gmail.com"
+        sender_name = settings.BREVO_SENDER_NAME or "Sistema de Solicitudes e Inventario BDG"
+        headers = {
+            "api-key": settings.BREVO_API_KEY,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        payload = {
+            "sender": {"name": sender_name, "email": sender_email},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "htmlContent": html_content,
+            "textContent": text_content
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers)
+            if resp.status_code in (200, 201):
+                logger.info(f"✉️ Correo enviado exitosamente a {to_email} vía Brevo HTTPS API.")
+                return True
+            else:
+                logger.error(f"❌ Error al enviar correo vía Brevo API ({resp.status_code}): {resp.text}")
+                return False
+    except Exception as e:
+        logger.error(f"❌ Excepción conectando a Brevo API: {e}")
+        return False
+
+
 async def _send_resend_http(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
     """Envío de correo mediante la API REST HTTPS de Resend (Puerto 443 - Compatible con Render Free)."""
     try:
@@ -85,25 +115,33 @@ async def send_email(to_email: str, subject: str, html_content: str, text_conten
     """
     Envía un correo electrónico.
     Prioridad:
-    1. Si RESEND_API_KEY está configurado -> Resend HTTPS API (puerto 443, ideal para Render Free).
-    2. Si SMTP_USER y SMTP_PASSWORD están configurados -> Gmail SMTP (puerto 587).
-    3. Respaldo a consola si ninguno está configurado o si ocurre un fallo.
+    1. Si BREVO_API_KEY está configurado -> Brevo HTTPS API (puerto 443, envía a cualquier correo sin dominio).
+    2. Si RESEND_API_KEY está configurado -> Resend HTTPS API (puerto 443).
+    3. Si SMTP_USER y SMTP_PASSWORD están configurados -> Gmail SMTP (puerto 587).
+    4. Respaldo a consola si ninguno está configurado o si ocurre un fallo.
     """
-    # 1. Intentar con Resend (HTTPS / Puerto 443)
+    # 1. Intentar con Brevo (HTTPS / Puerto 443 - Envía a CUALQUIER destinatario)
+    if settings.BREVO_API_KEY:
+        success = await _send_brevo_http(to_email, subject, html_content, text_content)
+        if success:
+            return True
+        logger.warning("Fallo en envío vía Brevo API, recurriendo a siguiente método...")
+
+    # 2. Intentar con Resend (HTTPS / Puerto 443)
     if settings.RESEND_API_KEY:
         success = await _send_resend_http(to_email, subject, html_content, text_content)
         if success:
             return True
-        logger.warning("Fallo en envío vía Resend API, recurriendo a respaldo en consola...")
+        logger.warning("Fallo en envío vía Resend API, recurriendo a siguiente método...")
 
-    # 2. Intentar con Gmail SMTP (si está configurado)
+    # 3. Intentar con Gmail SMTP (si está configurado)
     elif settings.SMTP_USER and settings.SMTP_PASSWORD:
         success = await asyncio.to_thread(_send_sync_smtp, to_email, subject, html_content, text_content)
         if success:
             return True
         logger.warning("Fallo en envío SMTP, recurriendo a respaldo en consola...")
 
-    # 3. Fallback / Desarrollo
+    # 4. Fallback / Desarrollo
     _log_simulated_email(to_email, subject, text_content, code=code)
     return False
 

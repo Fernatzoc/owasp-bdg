@@ -1,20 +1,25 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from app.services.email_service import (
     send_otp_email,
     send_verification_email,
     send_password_reset_email,
     send_lockout_warning_email,
-    _send_sync_smtp
+    _send_sync_smtp,
+    _send_resend_http,
+    _send_brevo_http
 )
 from app.core.config import settings
 
 
 @pytest.mark.asyncio
 async def test_email_fallback_when_smtp_not_configured():
-    """Verifica que sin credenciales SMTP no lance error y use el modo consola."""
-    with patch.object(settings, "SMTP_USER", None), patch.object(settings, "SMTP_PASSWORD", None):
-        # No debe lanzar excepción
+    """Verifica que sin credenciales no lance error y use el modo consola."""
+    with patch.object(settings, "SMTP_USER", None), \
+         patch.object(settings, "SMTP_PASSWORD", None), \
+         patch.object(settings, "RESEND_API_KEY", None), \
+         patch.object(settings, "BREVO_API_KEY", None):
+        
         await send_otp_email("test@empresa.com", "Juan Perez", "123456")
         await send_verification_email("test@empresa.com", "Juan Perez", "dummy_token")
         await send_password_reset_email("test@empresa.com", "Juan Perez", "dummy_token")
@@ -46,9 +51,6 @@ def test_smtp_send_success_mock():
 @pytest.mark.asyncio
 async def test_resend_http_send_mock():
     """Verifica que con RESEND_API_KEY se realice la llamada POST a la API de Resend."""
-    from unittest.mock import AsyncMock
-    from app.services.email_service import _send_resend_http
-
     mock_resp = MagicMock()
     mock_resp.status_code = 200
 
@@ -58,6 +60,25 @@ async def test_resend_http_send_mock():
         success = await _send_resend_http(
             to_email="cliente@gmail.com",
             subject="Test Resend",
+            html_content="<p>Prueba</p>",
+            text_content="Prueba"
+        )
+        assert success is True
+
+
+@pytest.mark.asyncio
+async def test_brevo_http_send_mock():
+    """Verifica que con BREVO_API_KEY se realice la llamada POST a la API de Brevo."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 201
+
+    with patch.object(settings, "BREVO_API_KEY", "xkeysib-test-123"), \
+         patch.object(settings, "BREVO_SENDER_EMAIL", "fernandotzoc4@gmail.com"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp):
+
+        success = await _send_brevo_http(
+            to_email="cliente@cualquiera.com",
+            subject="Test Brevo",
             html_content="<p>Prueba</p>",
             text_content="Prueba"
         )

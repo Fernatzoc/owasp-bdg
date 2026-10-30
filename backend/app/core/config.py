@@ -41,11 +41,16 @@ class Settings(BaseSettings):
     TIMEZONE: str = "America/Guatemala"
 
     # Configuración de Correo Electrónico
-    # 1. Vía Resend HTTPS API (Puerto 443 - No bloqueado por Render Free)
+    # 1. Vía Brevo HTTPS API (Recomendado para enviar a CUALQUIER correo sin dominio - Puerto 443)
+    BREVO_API_KEY: Optional[str] = None
+    BREVO_SENDER_EMAIL: Optional[str] = None
+    BREVO_SENDER_NAME: str = "Sistema de Solicitudes e Inventario BDG"
+
+    # 2. Vía Resend HTTPS API (Puerto 443 - Requiere dominio propio para enviar a terceros)
     RESEND_API_KEY: Optional[str] = None
     RESEND_FROM: str = "Sistema de Inventario <onboarding@resend.dev>"
 
-    # 2. Vía Gmail SMTP tradicional (Puerto 587)
+    # 3. Vía Gmail SMTP tradicional (Puerto 587)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
