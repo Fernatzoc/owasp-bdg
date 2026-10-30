@@ -364,8 +364,9 @@ async def resend_otp(db: AsyncIOMotorDatabase, login_ticket: str, ip: str) -> Di
         if creado_en.tzinfo is None:
             creado_en = creado_en.replace(tzinfo=timezone.utc)
         segundos_transcurridos = (ahora - creado_en).total_seconds()
-        if segundos_transcurridos < settings.OTP_RESEND_WAIT_SECONDS:
-            segundos_restantes = int(settings.OTP_RESEND_WAIT_SECONDS - segundos_transcurridos)
+        # Tolerancia de 2 segundos para sincronía de reloj cliente-servidor
+        if segundos_transcurridos < (settings.OTP_RESEND_WAIT_SECONDS - 2):
+            segundos_restantes = max(1, int(settings.OTP_RESEND_WAIT_SECONDS - segundos_transcurridos))
             raise AppException(
                 status_code=429,
                 codigo="ESPERA_REQUERIDA",

@@ -8,7 +8,7 @@ export default function P02_OtpVerification() {
   const navigate = useNavigate();
   const { verifyOtp, resendOtp } = useAuth();
 
-  const loginTicket = location.state?.loginTicket;
+  const [currentTicket, setCurrentTicket] = useState(location.state?.loginTicket);
   const userEmail = location.state?.email || 'su correo';
   const [demoOtp, setDemoOtp] = useState(location.state?.demoOtp || null);
 
@@ -29,10 +29,10 @@ export default function P02_OtpVerification() {
 
   // Redirigir al login si no hay ticket
   useEffect(() => {
-    if (!loginTicket) {
+    if (!currentTicket) {
       navigate('/login');
     }
-  }, [loginTicket, navigate]);
+  }, [currentTicket, navigate]);
 
   // Temporizador principal de 5:00
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function P02_OtpVerification() {
     setLoading(true);
 
     try {
-      await verifyOtp(loginTicket, codeToVerify, false);
+      await verifyOtp(currentTicket, codeToVerify, false);
       navigate('/dashboard');
     } catch (err) {
       const resp = err.response?.data;
@@ -115,7 +115,7 @@ export default function P02_OtpVerification() {
         // Redirigir a P03 Aviso de sesión activa
         navigate('/sesion-activa', {
           state: {
-            loginTicket,
+            loginTicket: currentTicket,
             otp: codeToVerify,
             email: userEmail
           }
@@ -141,7 +141,10 @@ export default function P02_OtpVerification() {
     setLoading(true);
 
     try {
-      const data = await resendOtp(loginTicket);
+      const data = await resendOtp(currentTicket);
+      if (data?.login_ticket) {
+        setCurrentTicket(data.login_ticket);
+      }
       if (data?.demo_otp) {
         setDemoOtp(data.demo_otp);
       }
@@ -153,7 +156,12 @@ export default function P02_OtpVerification() {
       setDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } catch (err) {
-      setError(err.response?.data?.mensaje || 'No se pudo reenviar el código');
+      const codigo = err.response?.data?.codigo;
+      if (codigo === 'TOKEN_EXPIRADO') {
+        setError('El tiempo de verificación ha expirado. Por favor inicie sesión nuevamente.');
+      } else {
+        setError(err.response?.data?.mensaje || 'No se pudo reenviar el código');
+      }
     } finally {
       setLoading(false);
     }

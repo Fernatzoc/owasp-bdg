@@ -57,6 +57,7 @@ api.interceptors.response.use(
     if (status === 401 && !originalRequest._retry) {
       const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
                              originalRequest.url?.includes('/auth/verify-otp') ||
+                             originalRequest.url?.includes('/auth/resend-otp') ||
                              originalRequest.url?.includes('/auth/refresh');
 
       // Intentar refrescar token si tenemos un refresh_token y no es un endpoint de login
