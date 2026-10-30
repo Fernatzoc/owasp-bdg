@@ -40,7 +40,12 @@ class Settings(BaseSettings):
     MOCK_EXTERNAL_SERVICES: bool = True
     TIMEZONE: str = "America/Guatemala"
 
-    # Configuración de Correo Electrónico (Gmail SMTP)
+    # Configuración de Correo Electrónico
+    # 1. Vía Resend HTTPS API (Puerto 443 - No bloqueado por Render Free)
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM: str = "Sistema de Inventario <onboarding@resend.dev>"
+
+    # 2. Vía Gmail SMTP tradicional (Puerto 587)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None

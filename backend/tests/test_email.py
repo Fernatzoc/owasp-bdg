@@ -41,3 +41,24 @@ def test_smtp_send_success_mock():
         mock_smtp_instance.starttls.assert_called_once()
         mock_smtp_instance.login.assert_called_once_with("notificaciones@gmail.com", "abcd efgh ijkl mnop")
         mock_smtp_instance.sendmail.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_resend_http_send_mock():
+    """Verifica que con RESEND_API_KEY se realice la llamada POST a la API de Resend."""
+    from unittest.mock import AsyncMock
+    from app.services.email_service import _send_resend_http
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+
+    with patch.object(settings, "RESEND_API_KEY", "re_test_key_123"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp):
+
+        success = await _send_resend_http(
+            to_email="cliente@gmail.com",
+            subject="Test Resend",
+            html_content="<p>Prueba</p>",
+            text_content="Prueba"
+        )
+        assert success is True

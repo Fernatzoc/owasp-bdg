@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import smtplib
+import httpx
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -8,6 +9,34 @@ from typing import Optional
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def _send_resend_http(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
+    """Envío de correo mediante la API REST HTTPS de Resend (Puerto 443 - Compatible con Render Free)."""
+    try:
+        from_email = settings.RESEND_FROM or "Sistema de Inventario <onboarding@resend.dev>"
+        headers = {
+            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": text_content
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post("https://api.resend.com/emails", json=payload, headers=headers)
+            if resp.status_code in (200, 201):
+                logger.info(f"✉️ Correo enviado exitosamente a {to_email} vía Resend HTTPS API.")
+                return True
+            else:
+                logger.error(f"❌ Error al enviar correo vía Resend API ({resp.status_code}): {resp.text}")
+                return False
+    except Exception as e:
+        logger.error(f"❌ Excepción conectando a Resend API: {e}")
+        return False
 
 
 def _send_sync_smtp(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
@@ -39,7 +68,7 @@ def _send_sync_smtp(to_email: str, subject: str, html_content: str, text_content
 
 
 def _log_simulated_email(to_email: str, subject: str, content: str, code: Optional[str] = None):
-    """Respaldo para desarrollo o cuando SMTP no está configurado."""
+    """Respaldo para desarrollo o cuando SMTP/Resend no están configurados."""
     border = "=" * 60
     logger.info(
         f"\n{border}\n"
@@ -54,18 +83,27 @@ def _log_simulated_email(to_email: str, subject: str, content: str, code: Option
 
 async def send_email(to_email: str, subject: str, html_content: str, text_content: str, code: Optional[str] = None) -> bool:
     """
-    Envía un correo electrónico. Si SMTP_USER y SMTP_PASSWORD están configurados,
-    intenta enviar por Gmail SMTP. De lo contrario o si falla, registra en consola.
+    Envía un correo electrónico.
+    Prioridad:
+    1. Si RESEND_API_KEY está configurado -> Resend HTTPS API (puerto 443, ideal para Render Free).
+    2. Si SMTP_USER y SMTP_PASSWORD están configurados -> Gmail SMTP (puerto 587).
+    3. Respaldo a consola si ninguno está configurado o si ocurre un fallo.
     """
-    smtp_ready = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
+    # 1. Intentar con Resend (HTTPS / Puerto 443)
+    if settings.RESEND_API_KEY:
+        success = await _send_resend_http(to_email, subject, html_content, text_content)
+        if success:
+            return True
+        logger.warning("Fallo en envío vía Resend API, recurriendo a respaldo en consola...")
 
-    if smtp_ready:
+    # 2. Intentar con Gmail SMTP (si está configurado)
+    elif settings.SMTP_USER and settings.SMTP_PASSWORD:
         success = await asyncio.to_thread(_send_sync_smtp, to_email, subject, html_content, text_content)
         if success:
             return True
-        logger.warning("Fallo en envío SMTP, recurriendo a registro en consola como respaldo...")
+        logger.warning("Fallo en envío SMTP, recurriendo a respaldo en consola...")
 
-    # Fallback / Desarrollo
+    # 3. Fallback / Desarrollo
     _log_simulated_email(to_email, subject, text_content, code=code)
     return False
 
