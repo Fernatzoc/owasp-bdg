@@ -313,7 +313,6 @@ async def login_step1(db: AsyncIOMotorDatabase, data: LoginStep1Request, ip: str
         user_name=usuario.get("nombre", "Usuario"),
         otp_code=otp_code
     )
-    )
 
     # 9. Generar login_ticket firmado
     login_ticket = create_login_ticket(
