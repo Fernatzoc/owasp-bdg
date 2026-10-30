@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClient
 
 from app.core.config import ROL_ADMIN, ROL_PROVEEDOR, ROL_COMPRAS, ROL_BODEGA
 from app.core.exceptions import AppException
-from app.core.security import send_simulated_email
+from app.services.email_service import send_request_notification_email
 from app.schemas.request import (
     RequestCreate,
     RequestUpdate,
@@ -250,10 +250,11 @@ async def create_request(
     })
 
     if data.enviar:
-        send_simulated_email(
+        await send_request_notification_email(
             to_email=prov["email"],
-            subject=f"Nueva solicitud de productos: {numero_solicitud}",
-            content=f"Estimado {prov['nombre']}. Ha recibido la solicitud {numero_solicitud} con fecha de entrega requerida {data.fecha_entrega}. Por favor ingrese al sistema para confirmar las cantidades disponibles."
+            recipient_name=prov["nombre"],
+            subject_text=f"Nueva solicitud {numero_solicitud}",
+            message_text=f"Ha recibido la solicitud {numero_solicitud} con fecha de entrega requerida {data.fecha_entrega}. Por favor ingrese al sistema para confirmar las cantidades disponibles."
         )
 
     doc["_id"] = req_id
@@ -366,10 +367,11 @@ async def send_request_to_supplier(
     # Notificar proveedor
     prov = await db.proveedores.find_one({"_id": req["proveedor_id"]})
     if prov:
-        send_simulated_email(
+        await send_request_notification_email(
             to_email=prov["email"],
-            subject=f"Nueva solicitud de compra {req['numero']}",
-            content=f"Estimado {prov['nombre']}. La solicitud {req['numero']} ha sido enviada para su confirmación."
+            recipient_name=prov["nombre"],
+            subject_text=f"Nueva solicitud de compra {req['numero']}",
+            message_text=f"La solicitud {req['numero']} ha sido enviada para su confirmación."
         )
 
     return await get_request_by_id(db, req_id, user)

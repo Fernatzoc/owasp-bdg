@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     RECAPTCHA_SECRET_KEY: str = "test_recaptcha_secret"
     MOCK_EXTERNAL_SERVICES: bool = True
     TIMEZONE: str = "America/Guatemala"
+
+    # Configuración de Correo Electrónico (Gmail SMTP)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = None
+    SMTP_FROM_NAME: str = "Sistema de Solicitudes e Inventario BDG"
+    SMTP_TLS: bool = True
+    FRONTEND_URL: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(
         env_file=".env",

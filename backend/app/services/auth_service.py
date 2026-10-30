@@ -28,6 +28,13 @@ from app.schemas.auth import (
     UserSummary
 )
 from app.services.audit_service import record_audit_event
+from app.services.email_service import (
+    send_otp_email,
+    send_verification_email,
+    send_password_reset_email,
+    send_lockout_warning_email,
+    send_email
+)
 
 
 async def register_user(db: AsyncIOMotorDatabase, data: UserRegisterRequest, ip: str) -> Dict[str, Any]:
@@ -91,12 +98,11 @@ async def register_user(db: AsyncIOMotorDatabase, data: UserRegisterRequest, ip:
     }
     await db.tokens_verificacion.insert_one(token_doc)
 
-    # 6. Simular envío de correo
-    verify_url = f"http://localhost:5173/verificar-email?token={raw_token}"
-    send_simulated_email(
+    # 6. Envío de correo de verificación
+    await send_verification_email(
         to_email=email_normalizado,
-        subject="Verificación de cuenta - Sistema de Solicitudes",
-        content=f"Bienvenido {data.nombre}. Para activar su cuenta haga clic en el siguiente enlace:\n{verify_url}\n(Válido por 24 horas)."
+        user_name=data.nombre,
+        token=raw_token
     )
 
     await record_audit_event(
@@ -246,10 +252,10 @@ async def login_step1(db: AsyncIOMotorDatabase, data: LoginStep1Request, ip: str
         )
 
         if bloqueado:
-            send_simulated_email(
+            await send_lockout_warning_email(
                 to_email=email_normalizado,
-                subject="Alerta de seguridad - Cuenta bloqueada temporalmente",
-                content=f"Hola {usuario['nombre']}. Su cuenta ha sido bloqueada temporalmente por {settings.LOCKOUT_DURATION_MINUTES} minutos debido a 5 intentos fallidos consecutivos de inicio de sesión."
+                user_name=usuario.get("nombre", "Usuario"),
+                duration_minutes=settings.LOCKOUT_DURATION_MINUTES
             )
 
         raise AppException(
@@ -301,12 +307,12 @@ async def login_step1(db: AsyncIOMotorDatabase, data: LoginStep1Request, ip: str
     result_token = await db.tokens_verificacion.insert_one(token_doc)
     token_id = str(result_token.inserted_id)
 
-    # 8. Simular envío por correo del OTP
-    send_simulated_email(
+    # 8. Envío por correo del OTP (Gmail SMTP o respaldo en consola)
+    await send_otp_email(
         to_email=email_normalizado,
-        subject="Código de verificación de inicio de sesión (OTP)",
-        content=f"Hola {usuario['nombre']}. Su código de seguridad de un solo uso es:\n{otp_code}\nEste código vence en 5 minutos y es de un solo uso.",
-        code=otp_code
+        user_name=usuario.get("nombre", "Usuario"),
+        otp_code=otp_code
+    )
     )
 
     # 9. Generar login_ticket firmado
@@ -392,11 +398,10 @@ async def resend_otp(db: AsyncIOMotorDatabase, login_ticket: str, ip: str) -> Di
     result_token = await db.tokens_verificacion.insert_one(token_doc)
     nuevo_token_id = str(result_token.inserted_id)
 
-    send_simulated_email(
+    await send_otp_email(
         to_email=usuario["email"],
-        subject="Nuevo código de verificación OTP",
-        content=f"Hola {usuario['nombre']}. Su nuevo código OTP es:\n{otp_code}\n(Vence en 5 minutos).",
-        code=otp_code
+        user_name=usuario.get("nombre", "Usuario"),
+        otp_code=otp_code
     )
 
     nuevo_ticket = create_login_ticket(
@@ -627,11 +632,10 @@ async def forgot_password_request(db: AsyncIOMotorDatabase, email: str, captcha_
         }
         await db.tokens_verificacion.insert_one(token_doc)
 
-        reset_url = f"http://localhost:5173/nueva-contrasena?token={raw_token}"
-        send_simulated_email(
+        await send_password_reset_email(
             to_email=email_normalizado,
-            subject="Recuperación de contraseña - Sistema de Solicitudes",
-            content=f"Hola {usuario['nombre']}. Ha solicitado restablecer su contraseña.\nHaga clic en el siguiente enlace:\n{reset_url}\n(Vigencia de 30 minutos)."
+            user_name=usuario.get("nombre", "Usuario"),
+            token=raw_token
         )
 
         await record_audit_event(
@@ -742,10 +746,11 @@ async def reset_password_with_token(
     )
 
     # Notificar por correo
-    send_simulated_email(
+    await send_email(
         to_email=usuario["email"],
-        subject="Contraseña actualizada exitosamente",
-        content=f"Hola {usuario['nombre']}. Su contraseña ha sido modificada. Por seguridad, todas las sesiones activas han sido cerradas."
+        subject="Contraseña actualizada exitosamente - Sistema de Inventario",
+        html_content=f"<p>Hola {usuario.get('nombre', 'Usuario')}, le confirmamos que su contraseña ha sido modificada exitosamente. Por seguridad, todas las sesiones activas han sido cerradas.</p>",
+        text_content=f"Hola {usuario.get('nombre', 'Usuario')}. Su contraseña ha sido modificada. Por seguridad, todas las sesiones activas han sido cerradas."
     )
 
     await record_audit_event(
