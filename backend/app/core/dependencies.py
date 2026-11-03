@@ -75,28 +75,39 @@ async def get_current_user_and_session(
             mensaje="Identificadores de token malformados"
         )
 
-    # Validar sesión única y activa en base de datos (RF-SEG-06)
+    # Validar que la sesión exista, esté activa y pertenezca al usuario del token (RF-SEG-06)
     session = await db.sesiones.find_one({"_id": session_id})
     now = datetime.now(timezone.utc)
 
-    if not session or not session.get("activa", False):
+    if (
+        not session
+        or not session.get("activa", False)
+        or str(session.get("usuario_id")) != str(user_id)
+    ):
         raise AppException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             codigo="SESION_INVALIDADA",
-            mensaje="Su sesión fue cerrada porque se inició en otro equipo o ha expirado"
+            mensaje="La sesión no es válida, ha sido cerrada o no pertenece al usuario"
         )
 
     expira_en = session.get("expira_en")
-    if expira_en:
-        if expira_en.tzinfo is None:
-            expira_en = expira_en.replace(tzinfo=timezone.utc)
-        if expira_en < now:
-            await db.sesiones.update_one({"_id": session_id}, {"$set": {"activa": False}})
-            raise AppException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                codigo="SESION_INVALIDADA",
-                mensaje="Su sesión ha expirado por inactividad"
-            )
+    if not expira_en:
+        raise AppException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            codigo="SESION_INVALIDADA",
+            mensaje="La sesión no tiene una fecha de expiración válida"
+        )
+
+    if expira_en.tzinfo is None:
+        expira_en = expira_en.replace(tzinfo=timezone.utc)
+
+    if expira_en < now:
+        await db.sesiones.update_one({"_id": session_id}, {"$set": {"activa": False}})
+        raise AppException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            codigo="SESION_EXPIRADA",
+            mensaje="La sesión ha expirado por inactividad"
+        )
 
     # Renovación deslizante por actividad (30 minutos)
     nueva_expiracion = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -141,6 +152,9 @@ async def get_current_session(
 def require_roles(*allowed_roles: str):
     async def role_checker(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
         user_roles = user.get("roles", [])
+        if not isinstance(user_roles, list):
+            user_roles = []
+
         # Administrador tiene acceso total
         if ROL_ADMIN in user_roles:
             return user
@@ -158,6 +172,9 @@ def require_roles(*allowed_roles: str):
 def require_permissions(*required_permissions: str):
     async def permission_checker(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
         user_roles = user.get("roles", [])
+        if not isinstance(user_roles, list):
+            user_roles = []
+
         if ROL_ADMIN in user_roles:
             return user
 
