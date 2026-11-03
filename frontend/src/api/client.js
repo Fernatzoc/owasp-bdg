@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { sanitizarPayload } from '../utils/sanitizer';
 
 // Función para obtener o inicializar el ID persistente del dispositivo
 export const getDeviceId = () => {
@@ -25,6 +26,12 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     config.headers['X-Device-Id'] = getDeviceId();
+
+    // Sanitización automática de todos los formularios de la aplicación (OWASP XSS / SQLi)
+    if (config.data && typeof config.data === 'object') {
+      config.data = sanitizarPayload(config.data);
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
