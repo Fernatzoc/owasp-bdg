@@ -29,6 +29,29 @@ export default function P04_Register() {
   const strengthLevels = ['Muy débil', 'Débil', 'Media', 'Buena', 'Fuerte'];
   const strengthColors = ['bg-rose-500', 'bg-rose-400', 'bg-amber-400', 'bg-emerald-400', 'bg-emerald-600'];
 
+  function escaparHTML(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function limpiarPalabrasSQL(texto) {
+    // Lista de palabras reservadas que deseas remover
+    const palabrasReservadas = [
+        "SELECT", "INSERT", "UPDATE", "DELETE", "WHERE", "BETWEEN",
+        "USER_INPUT", "PASSWORD_INPUT", "FROM", "LIMIT",
+        "DROP", "UNION", "OR", "AND", "EXEC", "TRUNCATE", "ADMIN", 
+    ];
+
+    // Construimos una expresión regular dinámica con las palabras
+    // \b asegura que solo busque la palabra completa (ej: no borrará "ordenar" aunque tenga "or")
+    const regex = new RegExp(`\\b(${palabrasReservadas.join('|')})\\b`, 'gi');
+
+    // Reemplaza las coincidencias por un string vacío
+    return texto.replace(regex, '');
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -67,15 +90,25 @@ export default function P04_Register() {
       return;
     }
 
+    let nombreLimpio = escaparHTML(limpiarPalabrasSQL(nombre));
+    let confirmPasswordLimpia = escaparHTML(limpiarPalabrasSQL(confirmPassword));
+    let passwordLimpia = escaparHTML(limpiarPalabrasSQL(password));
+
+    confirmPasswordLimpia = confirmPasswordLimpia.trim();
+    confirmPasswordLimpia = confirmPasswordLimpia.replaceAll(" ", "");
+
+    passwordLimpia = passwordLimpia.trim();
+    passwordLimpia = passwordLimpia.replaceAll(" ", "");
+
     setError(null);
     setLoading(true);
 
     try {
       const resp = await api.post('/auth/register', {
-        nombre: nombre.trim(),
+        nombre: nombreLimpio,
         email: email.trim(),
-        password,
-        confirm_password: confirmPassword,
+        passwordLimpia,
+        confirm_password: confirmPasswordLimpia,
         captcha_token: captchaToken,
       });
 
@@ -171,6 +204,7 @@ export default function P04_Register() {
                   required
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
+                  maxLength={150}
                   placeholder="Juan Pérez"
                   className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
@@ -188,6 +222,7 @@ export default function P04_Register() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  maxLength={50}
                   placeholder="ejemplo@empresa.com"
                   className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
@@ -205,6 +240,7 @@ export default function P04_Register() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  maxLength={25}
                   placeholder="••••••••"
                   className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
@@ -270,6 +306,7 @@ export default function P04_Register() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  maxLength={25}
                   placeholder="••••••••"
                   className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />

@@ -89,6 +89,7 @@ export default function P01_Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ejemplo@empresa.com"
+                  maxLength={50}  
                   className="block w-full pl-10 pr-3 py-2.5 sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
               </div>
@@ -116,6 +117,7 @@ export default function P01_Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  maxLength={25}
                   className="block w-full pl-10 pr-10 py-2.5 sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
                 <button

@@ -80,6 +80,16 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const loginStep1 = async (email, password, captchaToken) => {
+
+    email = email.trim();
+    email = email.replaceAll(" ", "");
+
+
+    password = password.trim();
+    password = limpiarPalabrasSQL(password);
+    password = escaparHTML( password );
+    password = password.replaceAll(" ", "");
+
     const deviceId = getDeviceId();
     const response = await api.post('/auth/login', {
       email,
@@ -89,6 +99,29 @@ export const AuthProvider = ({ children }) => {
     });
     return response.data;
   };
+
+  function escaparHTML(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function limpiarPalabrasSQL(texto) {
+    // Lista de palabras reservadas que deseas remover
+    const palabrasReservadas = [
+        "SELECT", "INSERT", "UPDATE", "DELETE", "WHERE", "BETWEEN",
+        "USER_INPUT", "PASSWORD_INPUT", "FROM", "LIMIT",
+        "DROP", "UNION", "OR", "AND", "EXEC", "TRUNCATE", "ADMIN", 
+    ];
+
+    // Construimos una expresión regular dinámica con las palabras
+    // \b asegura que solo busque la palabra completa (ej: no borrará "ordenar" aunque tenga "or")
+    const regex = new RegExp(`\\b(${palabrasReservadas.join('|')})\\b`, 'gi');
+
+    // Reemplaza las coincidencias por un string vacío
+    return texto.replace(regex, '');
+  }
 
   const verifyOtp = async (loginTicket, otp, forzarCierreSesion = false) => {
     const deviceId = getDeviceId();
