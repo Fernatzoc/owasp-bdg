@@ -107,7 +107,7 @@ export default function P04_Register() {
       const resp = await api.post('/auth/register', {
         nombre: nombreLimpio,
         email: email.trim(),
-        passwordLimpia,
+        password: passwordLimpia,
         confirm_password: confirmPasswordLimpia,
         captcha_token: captchaToken,
       });
